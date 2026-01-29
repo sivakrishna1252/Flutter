@@ -150,7 +150,7 @@ pipeline {
         }
         failure {
             echo "Pipeline failed. Check logs for details."
-            node {
+            node('any') {
                 sh '''
                     docker logs "${CONTAINER_NAME:-diet-planner-api-main}" --tail 50 2>/dev/null || true
                 '''
