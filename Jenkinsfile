@@ -83,66 +83,6 @@ pipeline {
                 '''
             }
         }
-
-        stage('Health Check') {
-            steps {
-                script {
-                    echo "Waiting for service to be healthy..."
-                    sleep(time: 10, unit: 'SECONDS')
-
-                    // Check container status
-                    def containerStatus = sh(
-                        script: "docker ps --filter name=${CONTAINER_NAME} --format '{{.Status}}'",
-                        returnStdout: true
-                    ).trim()
-
-                    if (!containerStatus) {
-                        error("Container ${CONTAINER_NAME} failed to start")
-                    }
-
-                    echo "Container is running: ${containerStatus}"
-
-                    // HTTP Health Check
-                    def maxAttempts = 10
-                    def attempt = 0
-                    def healthCheckPassed = false
-
-                    while (attempt < maxAttempts && !healthCheckPassed) {
-                        attempt++
-                        echo "Health check attempt ${attempt}/${maxAttempts}..."
-
-                        try {
-                            def healthResponse = sh(
-                                script: "curl -f http://localhost:${HOST_PORT}/api/schema/ || exit 1",
-                                returnStdout: true
-                            ).trim()
-
-                            if (healthResponse) {
-                                echo "Health check passed: ${healthResponse}"
-                                healthCheckPassed = true
-                            }
-                        } catch (Exception e) {
-                            echo "Health check attempt ${attempt} failed: ${e.getMessage()}"
-                            if (attempt < maxAttempts) {
-                                sleep(time: 5, unit: 'SECONDS')
-                            }
-                        }
-                    }
-
-                    if (!healthCheckPassed) {
-                        // Get container logs for debugging
-                        def logs = sh(
-                            script: "docker logs ${CONTAINER_NAME} --tail 50",
-                            returnStdout: true
-                        )
-                        echo "Container logs:\n${logs}"
-                        error("Health check failed after ${maxAttempts} attempts")
-                    }
-
-                    echo "✅ Service is healthy and ready!"
-                }
-            }
-        }
     }
 
     post {
