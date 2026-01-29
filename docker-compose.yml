@@ -3,7 +3,7 @@ services:
     build: .
     container_name: django_app
     ports:
-      - "1513:1513"
+      - "8080:8080"
     volumes:
       - .:/app
       # Mount .env file if it exists (optional - comment out if file doesn't exist)
@@ -17,4 +17,4 @@ services:
       # - OPENAI_API_KEY=${OPENAI_API_KEY}
       # - OPENAI_BASE_URL=${OPENAI_BASE_URL}
     restart: unless-stopped
-    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:1513"
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8080"

@@ -22,8 +22,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
-# Expose port 1513
-EXPOSE 1513
+# Expose port 8080
+EXPOSE 8080
 
 # Run migrations and start server
-CMD python manage.py migrate && python manage.py runserver 0.0.0.0:1513
+CMD python manage.py migrate && python manage.py runserver 0.0.0.0:8080

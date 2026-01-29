@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile.production
     container_name: diet-planner-api-prod
     ports:
-      - "1513:1513"
+      - "8080:8080"
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=False
@@ -25,7 +25,7 @@ services:
       - db_volume:/app/db.sqlite3
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1513/api/schema/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/schema/"]
       interval: 30s
       timeout: 10s
       retries: 3

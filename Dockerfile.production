@@ -38,13 +38,13 @@ RUN useradd -m -u 1000 appuser && \
 USER appuser
 
 # Expose port
-EXPOSE 1513
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:1513/api/schema/')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/schema/')" || exit 1
 
 # Run migrations and start server
 CMD python manage.py migrate && \
     python manage.py collectstatic --noinput && \
-    gunicorn config.wsgi:application --bind 0.0.0.0:1513 --workers 3 --timeout 120
+    gunicorn config.wsgi:application --bind 0.0.0.0:8080 --workers 3 --timeout 120
