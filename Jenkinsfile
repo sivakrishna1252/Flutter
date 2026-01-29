@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    environment {
+        OPENAI_API_KEY = credentials('OPENAI_API_KEY')
+    }
+
     stages {
 
         stage('Checkout') {
@@ -11,15 +15,21 @@ pipeline {
 
         stage('Start Backend (Local)') {
             steps {
-                bat '''
-                cd %WORKSPACE%
-                if not exist venv (
-                    python -m venv venv
-                )
-                call venv\\Scripts\\activate
+                sh '''
+                cd $WORKSPACE
+
+                echo "Using OPENAI_API_KEY (length: ${#OPENAI_API_KEY})"
+
+                if [ ! -d "venv" ]; then
+                    python3 -m venv venv
+                fi
+
+                source venv/bin/activate
                 pip install -r requirements.txt
+
                 python manage.py migrate
-                start cmd /k python manage.py runserver 0.0.0.0:8001
+
+                echo "Backend setup completed (not running server)"
                 '''
             }
         }
@@ -27,7 +37,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Backend started locally for Flutter'
+            echo '✅ BUILD SUCCESS on Linux Jenkins'
+        }
+        failure {
+            echo '❌ BUILD FAILED'
         }
     }
 }
