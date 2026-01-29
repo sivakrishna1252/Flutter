@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    container_name: diet-planner-api-prod
+    ports:
+      - "1513:1513"
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=False
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://openrouter.ai/api/v1}
+      - OPENAI_MODEL_NAME=${OPENAI_MODEL_NAME:-nvidia/nemotron-3-nano-30b-a3b:free}
+      - OPENAI_IMAGE_MODEL_NAME=${OPENAI_IMAGE_MODEL_NAME:-stabilityai/stable-diffusion-xl-base-1.0}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+      - TWILIO_FROM_NUMBER=${TWILIO_FROM_NUMBER:-}
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - db_volume:/app/db.sqlite3
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1513/api/schema/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - diet-planner-network
+
+  # Optional: Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: diet-planner-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - static_volume:/app/staticfiles:ro
+      - media_volume:/app/media:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - web
+    restart: unless-stopped
+    networks:
+      - diet-planner-network
+
+volumes:
+  static_volume:
+  media_volume:
+  db_volume:
+
+networks:
+  diet-planner-network:
+    driver: bridge
