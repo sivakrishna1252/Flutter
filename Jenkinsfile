@@ -1,51 +1,34 @@
 pipeline {
     agent any
 
+    environment {
+        OPENAI_API_KEY = credentials('OPENAI_API_KEY')
+    }
+
     stages {
 
-        stage('Pull Latest Code') {
+        stage('Checkout Code') {
             steps {
+                echo '📥 Checking out code'
+                checkout scm
+            }
+        }
+
+        stage('Verify Environment') {
+            steps {
+                echo '🔍 Verifying Jenkins credentials'
                 sh '''
-                cd /var/www/diet_planner
-                git pull origin main
+                echo "OPENAI_API_KEY is set"
+                echo "Length: ${#OPENAI_API_KEY}"
                 '''
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Python Check') {
             steps {
+                echo '🐍 Running basic python check'
                 sh '''
-                cd /var/www/diet_planner
-                source venv/bin/activate
-                pip install -r requirements.txt
-                '''
-            }
-        }
-
-        stage('Run Migrations') {
-            steps {
-                sh '''
-                cd /var/www/diet_planner
-                source venv/bin/activate
-                python manage.py migrate
-                '''
-            }
-        }
-
-        stage('Collect Static') {
-            steps {
-                sh '''
-                cd /var/www/diet_planner
-                source venv/bin/activate
-                python manage.py collectstatic --noinput
-                '''
-            }
-        }
-
-        stage('Restart Django') {
-            steps {
-                sh '''
-                systemctl restart diet_planner
+                python3 --version || true
                 '''
             }
         }
@@ -53,10 +36,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Django deployed successfully'
+            echo '✅ BUILD SUCCESS (no deploy)'
         }
         failure {
-            echo '❌ Django deployment failed'
+            echo '❌ BUILD FAILED'
         }
     }
 }
