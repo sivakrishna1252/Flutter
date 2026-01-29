@@ -17,6 +17,10 @@ pipeline {
         stage('Allow Only main & dev') {
             steps {
                 script {
+                    // Manual runs or non-multibranch jobs don't set BRANCH_NAME; default to main
+                    if (env.BRANCH_NAME == null || env.BRANCH_NAME == '') {
+                        env.BRANCH_NAME = 'main'
+                    }
                     if (env.BRANCH_NAME != 'main' && env.BRANCH_NAME != 'dev') {
                         error("Not allowed to build branch: ${env.BRANCH_NAME}")
                     }
