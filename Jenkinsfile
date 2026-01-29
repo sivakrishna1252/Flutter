@@ -4,7 +4,8 @@ pipeline {
     environment {
         NODE_ENV = 'production'
 
-        // OpenAI credentials
+        // OpenAI credentials - add these in Jenkins: Manage Jenkins → Credentials → (your domain) → Add
+        // Required credential IDs: OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL_NAME, OPENAI_IMAGE_MODEL_NAME
         OPENAI_API_KEY         = credentials('OPENAI_API_KEY')
         OPENAI_BASE_URL        = credentials('OPENAI_BASE_URL')
         OPENAI_MODEL_NAME      = credentials('OPENAI_MODEL_NAME')
@@ -149,9 +150,11 @@ pipeline {
         }
         failure {
             echo "Pipeline failed. Check logs for details."
-            sh '''
-                docker logs "$CONTAINER_NAME" --tail 50 || true
-            '''
+            node {
+                sh '''
+                    docker logs "${CONTAINER_NAME:-diet-planner-api-main}" --tail 50 2>/dev/null || true
+                '''
+            }
         }
     }
 }
