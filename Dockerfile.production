@@ -1,5 +1,5 @@
 # Multi-stage build for production
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 # Set working directory
 WORKDIR /app
@@ -30,9 +30,10 @@ COPY --from=builder /root/.local /root/.local
 # Copy project files
 COPY . .
 
-# Create non-root user for security
+# Create non-root user and set entrypoint executable
 RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
+    chown -R appuser:appuser /app && \
+    chmod +x /app/entrypoint.sh
 
 # Switch to non-root user
 USER appuser
@@ -44,7 +45,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/schema/')" || exit 1
 
-# Run migrations and start server
-CMD python manage.py migrate && \
-    python manage.py collectstatic --noinput && \
-    gunicorn config.wsgi:application --bind 0.0.0.0:8080 --workers 3 --timeout 120
+# Entrypoint runs migrate, collectstatic, then gunicorn (exec = PID 1, proper signals)
+ENTRYPOINT ["/app/entrypoint.sh"]
