@@ -13,23 +13,22 @@ pipeline {
             }
         }
 
-        stage('Start Backend (Local)') {
+        stage('Local Backend Setup (Server Jenkins)') {
             steps {
                 sh '''
                 cd $WORKSPACE
 
                 echo "Using OPENAI_API_KEY (length: ${#OPENAI_API_KEY})"
 
-                if [ ! -d "venv" ]; then
+                if [ ! -d venv ]; then
                     python3 -m venv venv
                 fi
 
-                source venv/bin/activate
+                . venv/bin/activate
                 pip install -r requirements.txt
-
                 python manage.py migrate
 
-                echo "Backend setup completed (not running server)"
+                echo "Backend setup completed"
                 '''
             }
         }
@@ -37,7 +36,7 @@ pipeline {
 
     post {
         success {
-            echo '✅ BUILD SUCCESS on Linux Jenkins'
+            echo '✅ BUILD SUCCESS'
         }
         failure {
             echo '❌ BUILD FAILED'
