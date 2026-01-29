@@ -13,22 +13,25 @@ pipeline {
             }
         }
 
-        stage('Local Backend Setup (Server Jenkins)') {
+        stage('Local Backend Setup') {
             steps {
                 sh '''
                 cd $WORKSPACE
 
                 echo "Using OPENAI_API_KEY (length: ${#OPENAI_API_KEY})"
 
-                if [ ! -d venv ]; then
+                if [ ! -d "venv" ]; then
                     python3 -m venv venv
                 fi
 
                 . venv/bin/activate
+
+                pip install --upgrade pip setuptools
                 pip install -r requirements.txt
+
                 python manage.py migrate
 
-                echo "Backend setup completed"
+                echo "✅ Django setup completed"
                 '''
             }
         }
