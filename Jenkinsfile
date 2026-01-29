@@ -23,7 +23,7 @@ pipeline {
         }
 
         stage('Run Migrations') {
-            steps {
+            steps { shivaktishba
                 sh '''
                 cd /var/www/diet_planner
                 source venv/bin/activate
