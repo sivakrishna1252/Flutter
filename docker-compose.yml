@@ -1,0 +1,20 @@
+services:
+  web:
+    build: .
+    container_name: django_app
+    ports:
+      - "1513:1513"
+    volumes:
+      - .:/app
+      # Mount .env file if it exists (optional - comment out if file doesn't exist)
+      # - ./config/.env:/app/config/.env:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      # Add your environment variables here or use .env file
+      # - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      # - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      # - TWILIO_FROM_NUMBER=${TWILIO_FROM_NUMBER}
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+    restart: unless-stopped
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:1513"
