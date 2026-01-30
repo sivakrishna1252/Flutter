@@ -74,10 +74,13 @@
                         docker run -d \
                             --name "$CONTAINER_NAME" \
                             -p "$HOST_PORT:$CONTAINER_PORT" \
+                            -e DEBUG=False \
                             -e OPENAI_API_KEY="$OPENAI_API_KEY" \
                             -e OPENAI_BASE_URL="$OPENAI_BASE_URL" \
                             -e OPENAI_MODEL_NAME="$OPENAI_MODEL_NAME" \
                             -e OPENAI_IMAGE_MODEL_NAME="$OPENAI_IMAGE_MODEL_NAME" \
+                            -e DATABASE_PATH="/app/db_data/db.sqlite3" \
+                            -v diet_planner_db:/app/db_data \
                             --restart always \
                             diet-planner-api:"$BRANCH_NAME"
                     '''

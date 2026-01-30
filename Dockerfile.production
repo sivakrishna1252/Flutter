@@ -33,8 +33,9 @@ COPY --from=builder /usr/local /usr/local
 # Copy project files
 COPY . .
 
-# Create non-root user
-RUN useradd -m -u 1000 appuser && \
+# Create data directory and non-root user
+RUN mkdir -p /app/db_data && \
+    useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app && \
     chmod +x /app/entrypoint.sh
 
