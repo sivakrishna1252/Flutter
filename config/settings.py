@@ -54,6 +54,7 @@ AUTH_USER_MODEL = 'accounts.User'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',        #user production server sees swagger ui
     ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
@@ -63,6 +64,7 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API documentation for the Diet App',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    # 'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
     'SERVE_PERMISSIONS': ['rest_framework.permissions.IsAdminUser'],
 }
 
