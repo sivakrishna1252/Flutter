@@ -42,7 +42,7 @@ class LoginHistoryAdmin(admin.ModelAdmin):
     
     def get_user_name(self, obj):
         return obj.user.user_name
-    get_user_name.short_description = "User"
+    get_user_name.short_description = "Name"
 
 @admin.register(DailyNutritionSummary)
 class DailyNutritionSummaryAdmin(admin.ModelAdmin):
@@ -69,3 +69,6 @@ class MealEntryAdmin(admin.ModelAdmin):
     def get_user_name(self, obj):
         return obj.get_user_name()
     get_user_name.short_description = "Name"
+
+
+

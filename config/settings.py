@@ -63,6 +63,7 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API documentation for the Diet App',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.IsAdminUser'],
 }
 
 # CORS Configuration - Allow access from any origin
