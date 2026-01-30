@@ -14,12 +14,12 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 from datetime import timedelta
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables from .env file
-load_dotenv(BASE_DIR / "config" / ".env")
+load_dotenv(BASE_DIR / "config" / ".env", override=True)
+
 
 
 # Quick-start development settings - unsuitable for production
@@ -180,11 +180,12 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
 }
 
-# OpenAI Configuration
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
-OPENAI_BASE_URL = os.getenv('OPENAI_BASE_URL', 'https://openrouter.ai/api/v1')
-OPENAI_MODEL_NAME = os.getenv('OPENAI_MODEL_NAME', 'nvidia/nemotron-3-nano-30b-a3b:free')
-OPENAI_IMAGE_MODEL_NAME = os.getenv('OPENAI_IMAGE_MODEL_NAME', 'stabilityai/stable-diffusion-xl-base-1.0')
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
+
+OPENAI_MODEL_NAME = os.getenv("OPENAI_MODEL_NAME", "llama-3.3-70b-versatile")
+OPENAI_IMAGE_MODEL_NAME = "stabilityai/stable-diffusion-xl-base-1.0"
+
 
 # Twilio Configuration (Optional)
 TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID', '')

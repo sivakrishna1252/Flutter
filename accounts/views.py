@@ -456,6 +456,13 @@ class DashboardTodayView(APIView):
         user = request.user
         today = timezone.localdate()
 
+        # Get user's name
+        user_name = "User"
+        try:
+            user_name = user.profile.name if user.profile.name else "User"
+        except:
+            pass
+
         # Get nutrition targets based on user profile
         targets = calculate_nutrition_targets(user)
 
@@ -483,50 +490,51 @@ class DashboardTodayView(APIView):
             },
         )
 
-        # Update with current totals
+        # Always refresh consumed totals and sync targets from profile
         summary.calories_consumed = total_consumed["calories"]
         summary.protein_g = total_consumed["protein_g"]
         summary.carbs_g = total_consumed["carbs_g"]
         summary.fats_g = total_consumed["fats_g"]
         
-        # Update targets if they're not set
-        if summary.calories_target == 0:
-            summary.calories_target = targets["calories_target"]
-            summary.protein_target = targets["protein_target"]
-            summary.carbs_target = targets["carbs_target"]
-            summary.fats_target = targets["fats_target"]
+        # Keep targets in sync with profile
+        summary.calories_target = targets["calories_target"]
+        summary.protein_target = targets["protein_target"]
+        summary.carbs_target = targets["carbs_target"]
+        summary.fats_target = targets["fats_target"]
         
         summary.save()
 
-        macro_pct = summary.macro_percentages()
+        def get_pct(consumed, target):
+            if not target or target <= 0: return 0
+            return min(round((consumed / target) * 100), 100)
 
         data = {
+            "user_name": user_name,
             "date": today.isoformat(),
             "calories": {
-                "consumed": summary.calories_consumed,
-                "target": summary.calories_target,
-                "remaining": max(summary.calories_target - summary.calories_consumed, 0),
+                "consumed": int(summary.calories_consumed),
+                "target": int(summary.calories_target),
+                "remaining": max(int(summary.calories_target - summary.calories_consumed), 0),
+                "percentage": get_pct(summary.calories_consumed, summary.calories_target)
             },
-            "protein": {
+            "proteins": {
                 "consumed": round(summary.protein_g, 1),
                 "target": round(summary.protein_target, 1),
                 "remaining": round(max(summary.protein_target - summary.protein_g, 0), 1),
+                "percentage": get_pct(summary.protein_g, summary.protein_target)
             },
             "carbs": {
                 "consumed": round(summary.carbs_g, 1),
                 "target": round(summary.carbs_target, 1),
                 "remaining": round(max(summary.carbs_target - summary.carbs_g, 0), 1),
+                "percentage": get_pct(summary.carbs_g, summary.carbs_target)
             },
             "fats": {
                 "consumed": round(summary.fats_g, 1),
                 "target": round(summary.fats_target, 1),
                 "remaining": round(max(summary.fats_target - summary.fats_g, 0), 1),
-            },
-            "macros_percentage": {
-                "protein_pct": macro_pct["protein_pct"],
-                "carbs_pct": macro_pct["carbs_pct"],
-                "fats_pct": macro_pct["fats_pct"],
-            },
+                "percentage": get_pct(summary.fats_g, summary.fats_target)
+            }
         }
         return Response(data, status=status.HTTP_200_OK)
 
@@ -541,54 +549,108 @@ class DashboardWeeklyView(APIView):
     def get(self, request):
         user = request.user
         today = timezone.localdate()
-        start_date = today - timedelta(days=6) #This is last 7 days (including today)
+        start_date = today - timedelta(days=6)
+
+        user_name = "User"
+        try:
+            user_name = user.profile.name if user.profile.name else "User"
+        except:
+            pass
 
         qs = DailyNutritionSummary.objects.filter(
             user=user, date__gte=start_date, date__lte=today
         ).order_by("date")
 
-        # map date -> object for easy lookup
         by_date = {obj.date: obj for obj in qs}
 
         days = []
+        total_target_cal = 0
+        total_consumed_cal = 0
+        total_target_protein = 0
+        total_consumed_protein = 0
+        total_target_carbs = 0
+        total_consumed_carbs = 0
+        total_target_fats = 0
+        total_consumed_fats = 0
+
+        # Get current daily targets from profile for missing days
+        current_targets = calculate_nutrition_targets(user)
+
         for i in range(7):
             d = start_date + timedelta(days=i)
             obj = by_date.get(d)
             if obj:
-                macro_pct = obj.macro_percentages()
-                days.append(
-                    {
-                        "date": d.isoformat(),
-                        "calories_target": obj.calories_target,
-                        "calories_consumed": obj.calories_consumed,
-                        "calories_remaining": obj.calories_remaining,
-                        "protein_g": obj.protein_g,
-                        "carbs_g": obj.carbs_g,
-                        "fats_g": obj.fats_g,
-                        "protein_pct": macro_pct["protein_pct"],
-                        "carbs_pct": macro_pct["carbs_pct"],
-                        "fats_pct": macro_pct["fats_pct"],
-                    }
-                )
+                days.append({
+                    "date": d.isoformat(),
+                    "calories": int(obj.calories_consumed),
+                    "calories_target": int(obj.calories_target),
+                    "proteins": round(obj.protein_g, 1),
+                    "proteins_target": round(obj.protein_target, 1),
+                    "carbs": round(obj.carbs_g, 1),
+                    "carbs_target": round(obj.carbs_target, 1),
+                    "fats": round(obj.fats_g, 1),
+                    "fats_target": round(obj.fats_target, 1),
+                })
+                total_target_cal += obj.calories_target
+                total_consumed_cal += obj.calories_consumed
+                total_target_protein += obj.protein_target
+                total_consumed_protein += obj.protein_g
+                total_target_carbs += obj.carbs_target
+                total_consumed_carbs += obj.carbs_g
+                total_target_fats += obj.fats_target
+                total_consumed_fats += obj.fats_g
             else:
-                # no data that day → zeros
-                days.append(
-                    {
-                        "date": d.isoformat(),
-                        "calories_target": 0,
-                        "calories_consumed": 0,
-                        "calories_remaining": 0,
-                        "protein_g": 0,
-                        "carbs_g": 0,
-                        "fats_g": 0,
-                        "protein_pct": 0,
-                        "carbs_pct": 0,
-                        "fats_pct": 0,
-                    }
-                )
+                days.append({
+                    "date": d.isoformat(),
+                    "calories": 0,
+                    "calories_target": int(current_targets["calories_target"]),
+                    "proteins": 0.0,
+                    "proteins_target": round(current_targets["protein_target"], 1),
+                    "carbs": 0.0,
+                    "carbs_target": round(current_targets["carbs_target"], 1),
+                    "fats": 0.0,
+                    "fats_target": round(current_targets["fats_target"], 1),
+                })
+                total_target_cal += current_targets["calories_target"]
+                total_target_protein += current_targets["protein_target"]
+                total_target_carbs += current_targets["carbs_target"]
+                total_target_fats += current_targets["fats_target"]
 
-        return Response({"start_date": start_date.isoformat(), "end_date": today.isoformat(), "days": days},
-                        status=status.HTTP_200_OK)
+        def get_pct(consumed, target):
+            if not target or target <= 0: return 0
+            return min(round((consumed / target) * 100), 100)
+
+        data = {
+            "user_name": user_name,
+            "start_date": start_date.isoformat(),
+            "end_date": today.isoformat(),
+            "calories": {
+                "consumed": int(total_consumed_cal),
+                "target": int(total_target_cal),
+                "remaining": max(int(total_target_cal - total_consumed_cal), 0),
+                "percentage": get_pct(total_consumed_cal, total_target_cal)
+            },
+            "proteins": {
+                "consumed": round(total_consumed_protein, 1),
+                "target": round(total_target_protein, 1),
+                "remaining": round(max(total_target_protein - total_consumed_protein, 0), 1),
+                "percentage": get_pct(total_consumed_protein, total_target_protein)
+            },
+            "carbs": {
+                "consumed": round(total_consumed_carbs, 1),
+                "target": round(total_target_carbs, 1),
+                "remaining": round(max(total_target_carbs - total_consumed_carbs, 0), 1),
+                "percentage": get_pct(total_consumed_carbs, total_target_carbs)
+            },
+            "fats": {
+                "consumed": round(total_consumed_fats, 1),
+                "target": round(total_target_fats, 1),
+                "remaining": round(max(total_target_fats - total_consumed_fats, 0), 1),
+                "percentage": get_pct(total_consumed_fats, total_target_fats)
+            },
+            "days": days
+        }
+        return Response(data, status=status.HTTP_200_OK)
 
 #dashboard/monthly
 class DashboardMonthlyView(APIView):
@@ -610,6 +672,11 @@ class DashboardMonthlyView(APIView):
         user = request.user
         month_str = request.query_params.get("month")
 
+        user_name = "User"
+        try:
+            user_name = user.profile.name if user.profile.name else "User"
+        except:
+            pass
        
         if month_str:
             try:
@@ -622,7 +689,6 @@ class DashboardMonthlyView(APIView):
             today = timezone.localdate()
             first_day = date(today.year, today.month, 1)
 
-        # compute last day of month
         if first_day.month == 12:
             next_month = date(first_day.year + 1, 1, 1)
         else:
@@ -633,54 +699,96 @@ class DashboardMonthlyView(APIView):
             user=user, date__gte=first_day, date__lte=last_day
         ).order_by("date")
 
-        days = []
         by_date = {obj.date: obj for obj in qs}
+        
+        days = []
+        total_target_cal = 0
+        total_consumed_cal = 0
+        total_target_protein = 0
+        total_consumed_protein = 0
+        total_target_carbs = 0
+        total_consumed_carbs = 0
+        total_target_fats = 0
+        total_consumed_fats = 0
 
-        d = first_day
+        current_targets = calculate_nutrition_targets(user)
+
         while d <= last_day:
             obj = by_date.get(d)
             if obj:
-                macro_pct = obj.macro_percentages()
-                days.append(
-                    {
-                        "date": d.isoformat(),
-                        "calories_target": obj.calories_target,
-                        "calories_consumed": obj.calories_consumed,
-                        "calories_remaining": obj.calories_remaining,
-                        "protein_g": obj.protein_g,
-                        "carbs_g": obj.carbs_g,
-                        "fats_g": obj.fats_g,
-                        "protein_pct": macro_pct["protein_pct"],
-                        "carbs_pct": macro_pct["carbs_pct"],
-                        "fats_pct": macro_pct["fats_pct"],
-                    }
-                )
+                days.append({
+                    "date": d.isoformat(),
+                    "calories": int(obj.calories_consumed),
+                    "calories_target": int(obj.calories_target),
+                    "proteins": round(obj.protein_g, 1),
+                    "proteins_target": round(obj.protein_target, 1),
+                    "carbs": round(obj.carbs_g, 1),
+                    "carbs_target": round(obj.carbs_target, 1),
+                    "fats": round(obj.fats_g, 1),
+                    "fats_target": round(obj.fats_target, 1),
+                })
+                total_target_cal += obj.calories_target
+                total_consumed_cal += obj.calories_consumed
+                total_target_protein += obj.protein_target
+                total_consumed_protein += obj.protein_g
+                total_target_carbs += obj.carbs_target
+                total_consumed_carbs += obj.carbs_g
+                total_target_fats += obj.fats_target
+                total_consumed_fats += obj.fats_g
             else:
-                days.append(
-                    {
-                        "date": d.isoformat(),
-                        "calories_target": 0,
-                        "calories_consumed": 0,
-                        "calories_remaining": 0,
-                        "protein_g": 0,
-                        "carbs_g": 0,
-                        "fats_g": 0,
-                        "protein_pct": 0,
-                        "carbs_pct": 0,
-                        "fats_pct": 0,
-                    }
-                )
+                days.append({
+                    "date": d.isoformat(),
+                    "calories": 0,
+                    "calories_target": int(current_targets["calories_target"]),
+                    "proteins": 0.0,
+                    "proteins_target": round(current_targets["protein_target"], 1),
+                    "carbs": 0.0,
+                    "carbs_target": round(current_targets["carbs_target"], 1),
+                    "fats": 0.0,
+                    "fats_target": round(current_targets["fats_target"], 1),
+                })
+                total_target_cal += current_targets["calories_target"]
+                total_target_protein += current_targets["protein_target"]
+                total_target_carbs += current_targets["carbs_target"]
+                total_target_fats += current_targets["fats_target"]
             d += timedelta(days=1)
 
-        return Response(
-            {
-                "month": first_day.strftime("%Y-%m"),
-                "start_date": first_day.isoformat(),
-                "end_date": last_day.isoformat(),
-                "days": days,
+        def get_pct(consumed, target):
+            if not target or target <= 0: return 0
+            return min(round((consumed / target) * 100), 100)
+
+        data = {
+            "user_name": user_name,
+            "month": first_day.strftime("%Y-%m"),
+            "start_date": first_day.isoformat(),
+            "end_date": last_day.isoformat(),
+            "calories": {
+                "consumed": int(total_consumed_cal),
+                "target": int(total_target_cal),
+                "remaining": max(int(total_target_cal - total_consumed_cal), 0),
+                "percentage": get_pct(total_consumed_cal, total_target_cal)
             },
-            status=status.HTTP_200_OK,
-        )
+            "proteins": {
+                "consumed": round(total_consumed_protein, 1),
+                "target": round(total_target_protein, 1),
+                "remaining": round(max(total_target_protein - total_consumed_protein, 0), 1),
+                "percentage": get_pct(total_consumed_protein, total_target_protein)
+            },
+            "carbs": {
+                "consumed": round(total_consumed_carbs, 1),
+                "target": round(total_target_carbs, 1),
+                "remaining": round(max(total_target_carbs - total_consumed_carbs, 0), 1),
+                "percentage": get_pct(total_consumed_carbs, total_target_carbs)
+            },
+            "fats": {
+                "consumed": round(total_consumed_fats, 1),
+                "target": round(total_target_fats, 1),
+                "remaining": round(max(total_target_fats - total_consumed_fats, 0), 1),
+                "percentage": get_pct(total_consumed_fats, total_target_fats)
+            },
+            "days": days,
+        }
+        return Response(data, status=status.HTTP_200_OK)
 class MealCategoriesView(APIView):
     permission_classes = [AllowAny]
 
@@ -704,6 +812,7 @@ class MealCategoriesView(APIView):
             {"categories": categories},
             status=status.HTTP_200_OK
         )
+
 
 
 class MealRecommendationsView(APIView):

@@ -1,85 +1,66 @@
-
-
-import os
+from django.conf import settings
 import json
 from openai import OpenAI
 from urllib.parse import quote
+import httpx
 
-# Initialize OpenAI client lazily with proper error handling
+# Initialize OpenAI client lazily
 _client = None
 
 def get_openai_client():
-    """Get or initialize the OpenAI client"""
+    """Get or initialize the OpenAI client with robust configuration lookup"""
     global _client
     
     if _client is not None:
         return _client
     
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    openai_base_url = os.getenv("OPENAI_BASE_URL")
-    
-    if not openai_api_key:
-        print("Warning: OPENAI_API_KEY environment variable is not set")
+    import os
+
+    try:
+        api_key = getattr(settings, "OPENAI_API_KEY", os.getenv("OPENAI_API_KEY", ""))
+        base_url = getattr(settings, "OPENAI_BASE_URL", os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"))
+    except Exception as e:
+        print(f"DEBUG: Error accessing settings: {e}")
+        api_key = os.getenv("OPENAI_API_KEY", "")
+        base_url = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
+
+    if not api_key:
+        print("DEBUG ERROR: OPENAI_API_KEY is empty/missing")
         return None
     
     try:
-        # Build client with minimal parameters to avoid proxy issues
+        # Create a custom httpx client to avoid "proxies" TypeError on Windows/Python 3.13
+        http_client = httpx.Client(
+            base_url=base_url,
+            follow_redirects=True,
+        )
+
         client_kwargs = {
-            "api_key": openai_api_key,
+            "api_key": api_key,
+            "base_url": base_url,
+            "http_client": http_client,
         }
         
-        if openai_base_url:
-            client_kwargs["base_url"] = openai_base_url
-        
-        # Initialize with httpx client to avoid proxy configuration issues
-        import httpx
-        http_client = httpx.Client()
-        client_kwargs["http_client"] = http_client
-        
         _client = OpenAI(**client_kwargs)
-        print(f"✓ OpenAI client initialized successfully")
-        print(f"  Base URL: {openai_base_url or 'default'}")
-        print(f"  API Key: {openai_api_key[:20]}...")
+        print(f"✓ Groq client initialized. Key starts with: {api_key[:10]}...")
         return _client
     except Exception as e:
-        print(f"✗ Warning: OpenAI client initialization failed: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"✗ Failed to initialize AI client: {e}")
         return None
 
 def get_fallback_image_url(item_name):
-    """
-    Generate fallback image URL using Unsplash API when image generation fails.
-    Returns a high-quality food image based on the item name.
-    """
-    try:
-        unsplash_key = os.getenv("UNSPLASH_ACCESS_KEY", "")
-        
-        if not unsplash_key:
-            # Use public Unsplash URL without API key (limited to 50/hour)
-            search_query = quote(item_name.split()[0])  # Use first word
-            return f"https://source.unsplash.com/400x400/?{search_query},food"
-        
-        # With API key for better reliability and more requests
-        search_query = quote(item_name)
-        return f"https://api.unsplash.com/photos/random?query={search_query}&w=400&h=400&client_id={unsplash_key}"
-    except Exception as e:
-        print(f"Fallback image URL generation failed: {e}")
-        # Return a generic food placeholder
-        return "https://via.placeholder.com/400x400?text=Food+Image"
+    """Generate fallback image URL using Unsplash"""
+    search_query = quote(item_name.split()[0] if item_name else "food")
+    return f"https://source.unsplash.com/400x400/?{search_query},food"
 
 def generate_meal_image(prompt):
-    """
-    Generate image for a meal item.
-    Tries OpenAI image generation first, falls back to Unsplash if that fails.
-    """
+   
     try:
         client = get_openai_client()
         if not client or not prompt:
-            # No client available, use fallback
-            return get_fallback_image_url(prompt or "Food")
+            return get_fallback_image_url(prompt)
         
-        image_model = os.getenv("OPENAI_IMAGE_MODEL_NAME", "stabilityai/stable-diffusion-xl-base-1.0")
+        image_model = getattr(settings, "OPENAI_IMAGE_MODEL_NAME", "stabilityai/stable-diffusion-xl-base-1.0")
         
         response = client.images.generate(
             model=image_model,
@@ -89,27 +70,20 @@ def generate_meal_image(prompt):
         )
         return response.data[0].url
     except Exception as e:
-        print(f"Image generation failed: {e}, using fallback URL")
-        # Extract item name from prompt if possible
-        item_name = prompt.split()[4] if len(prompt.split()) > 4 else "Food"
-        return get_fallback_image_url(item_name)
+        print(f"Image generation failed: {e}")
+        return get_fallback_image_url(prompt[:20] if prompt else "food")
 
 def generate_item_image_prompt(item_name, item_serving):
     """Generate a detailed image prompt for a meal item"""
-    return f"Professional food photography of {item_name} ({item_serving}), appetizing presentation, studio lighting, on a plate, high quality, professional restaurant style"
+    return f"Professional food photography of {item_name} ({item_serving}), appetizer presentation, studio lighting"
 
 def recommend_meals_for_user(profile, meal_type: str):
-    
-    # Get the client lazily
+    """Main function to recommend meals using AI"""
     client = get_openai_client()
-    
-    # Check if client is initialized
     if not client:
-        return {
-            "items": [],
-            "image_url": "",
-            "error": "OpenAI client not initialized. Please check API key configuration."
-        }
+        return {"items": [], "error": "AI client not configured."}
+
+    model_name = getattr(settings, "OPENAI_MODEL_NAME", "llama-3.3-70b-versatile")
 
     user_data = {
         "name": profile.name,
@@ -117,94 +91,46 @@ def recommend_meals_for_user(profile, meal_type: str):
         "weight": profile.weight,
         "height_cm": profile.height_cm,
         "gender": profile.gender,
-        "goal": profile.goal,                     # Weight Loss / Weight Gain / Muscle Gain
-        "diet_preference": profile.diet_preference,   # Veg / Non-Veg / etc.
+        "goal": profile.goal,
+        "diet_preference": profile.diet_preference,
         "health_conditions": profile.health_conditions or [],
         "allergies": profile.allergies or [],
     }
 
     system_prompt = (
-        "You are a nutritionist. For the given user, suggest suitable Indian food options "
-        "for one meal (breakfast/lunch/snacks/dinner). "
-        "Follow these rules:\n"
-        "- Strongly respect diet_preference (Veg, Non-Veg, Vegan, Eggetarian, Keto/Low-Carb, High Protein).\n"
-        "- STRICTLY avoid ALL allergens mentioned in allergies list.\n"
-        "- Respect health_conditions (e.g. Diabetes -> avoid sugar, simple carbs).\n"
-        "- Give foods that are realistic, commonly available.\n"
-        "- Respond ONLY as JSON with a single object: "
-        "{ 'items': [ { 'name', 'serving', 'calories', 'protein_g', 'carbs_g', 'fats_g', 'note' } ], "
-        "'image_prompt': 'A detailed visual description of the main dish recommended, suitable for generating an image' }.\n"
-        "- calories/macros can be approximate, but reasonable.\n"
-        "- 8 to 10 items max."
+        "You are a nutritionist. Suggest suitable Indian food options for one meal. "
+        "Respect diet_preference, health_conditions, and allergies. "
+        "Respond ONLY as JSON: { 'items': [ { 'name', 'serving', 'calories', 'protein_g', 'carbs_g', 'fats_g', 'note' } ], "
+        "'image_prompt': 'desc' }."
     )
-
-    user_prompt = {
-        "meal_type": meal_type,
-        "user": user_data,
-    }
-
-    model_name = os.getenv("OPENAI_MODEL_NAME", "gpt-4o-mini")
 
     try:
         resp = client.chat.completions.create(
             model=model_name,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": json.dumps(user_prompt)},
+                {"role": "user", "content": json.dumps({"meal_type": meal_type, "user": user_data})},
             ],
             temperature=0.5,
         )
-    except Exception as e:
-        print(f"Error calling OpenAI API: {e}")
-        return {
-            "items": [],
-            "image_url": "",
-            "error": f"Failed to generate meal recommendations: {str(e)}"
-        }
-
-    raw = resp.choices[0].message.content
-
-    try:
+        raw = resp.choices[0].message.content
         data = json.loads(raw)
         items = data.get("items", [])
-        image_prompt = data.get("image_prompt", "")
     except Exception as e:
-        print(f"Error parsing AI response: {e}")
-        items = [{"name": raw, "serving": "", "calories": 0, "protein_g": 0, "carbs_g": 0, "fats_g": 0, "note": ""}]
-        image_prompt = ""
+        print(f"Error calling AI: {e}")
+        return {"items": [], "error": f"Failed to generate: {str(e)}"}
 
-    # Generate image if prompt is available
-    image_url = generate_meal_image(image_prompt) if image_prompt else get_fallback_image_url("Food")
-
-    # small safety: only keep 5–8 records, ensure required keys present
-    # Generate individual image for each item
     cleaned = []
     for item in items[:8]:
-        item_name = item.get("name", "")
-        item_serving = item.get("serving", "")
-        
-        # Generate image prompt for this specific item
-        item_image_prompt = generate_item_image_prompt(item_name, item_serving)
-        item_image_url = generate_meal_image(item_image_prompt)
-        
-        # Ensure item_image_url is not empty (use fallback if needed)
-        if not item_image_url:
-            item_image_url = get_fallback_image_url(item_name)
-        
-        cleaned.append(
-            {
-                "name": item_name,
-                "serving": item_serving,
-                "calories": item.get("calories", 0),
-                "protein_g": item.get("protein_g", 0),
-                "carbs_g": item.get("carbs_g", 0),
-                "fats_g": item.get("fats_g", 0),
-                "note": item.get("note", ""),
-                "image_url": item_image_url,
-            }
-        )
+        cleaned.append({
+            "name": item.get("name", ""),
+            "serving": item.get("serving", ""),
+            "calories": item.get("calories", 0),
+            "protein_g": item.get("protein_g", 0),
+            "carbs_g": item.get("carbs_g", 0),
+            "fats_g": item.get("fats_g", 0),
+            "note": item.get("note", ""),
+            "image_url": get_fallback_image_url(item.get("name", "")) # Using fallback for speed
+        })
 
-    return {
-        "items": cleaned,
-        "image_url": image_url
-    }
+    return {"items": cleaned, "image_url": get_fallback_image_url(meal_type)}
