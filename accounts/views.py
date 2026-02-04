@@ -354,7 +354,7 @@ class OnboardingCompleteView(APIView):
             health_conditions = []
         
         if not isinstance(health_conditions, list):
-            return Response({"error": "health_conditions must be a list"}, status=400)
+            return Response({"error": "health_conditions m  ust be a list"}, status=400)
         
         if allergies is None:
             allergies = []
@@ -712,7 +712,7 @@ class DashboardMonthlyView(APIView):
         total_consumed_fats = 0
 
         current_targets = calculate_nutrition_targets(user)
-
+        d = first_day
         while d <= last_day:
             obj = by_date.get(d)
             if obj:
