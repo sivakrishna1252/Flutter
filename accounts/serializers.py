@@ -11,14 +11,12 @@ class VerifyOTPSerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ['id', 'user', 'image', 'bio', 'other_fields']  # Ensure 'image' is included
-    class Meta:
-        model = UserProfile
         fields = [
-            'name', 'age', 'weight', 'weight_unit', 'height_cm', 
+            'id', 'user', 'name', 'age', 'weight', 'weight_unit', 'height_cm', 
             'gender', 'goal', 'diet_preference', 'health_conditions', 
             'other_condition_text', 'allergies', 'allergy_notes', 'profile_image'
         ]
+        read_only_fields = ['user']
 
 class OnboardingSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)

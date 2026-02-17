@@ -438,6 +438,8 @@ class OnboardingProfileView(APIView):
                 "diet_preference": profile.diet_preference,
                 "health_conditions": profile.health_conditions,
                 "other_condition_text": profile.other_condition_text,
+                "allergies": profile.allergies,
+                "allergy_notes": profile.allergy_notes,
                 "onboarding_completed": user.onboarding_completed,
             },
             status=status.HTTP_200_OK,
@@ -1570,6 +1572,8 @@ class ProfileOverviewView(APIView):
             "diet_preference": profile.diet_preference,
             "health_conditions": profile.health_conditions,
             "other_condition_text": profile.other_condition_text,
+            "allergies": profile.allergies,
+            "allergy_notes": profile.allergy_notes,
             "profile_image_url": (
                 request.build_absolute_uri(profile.profile_image.url)
                 if profile.profile_image
@@ -1598,6 +1602,8 @@ class ProfileOverviewView(APIView):
         profile.other_condition_text = data.get(
             "other_condition_text", profile.other_condition_text
         )
+        profile.allergies = data.get("allergies", profile.allergies)
+        profile.allergy_notes = data.get("allergy_notes", profile.allergy_notes)
         profile.save()
 
         # Optional: mark onboarding completed
