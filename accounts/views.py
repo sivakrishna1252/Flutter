@@ -15,9 +15,9 @@ from .models import (
     UserProfile,
     UserAppSettings,
     DailyNutritionSummary,
-    Food,
     MealEntry,
     MealRecommendation,
+    WeeklyMealRecommendation
 )
 from .ai_recommender import recommend_meals_for_user
 
@@ -25,7 +25,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 from .serializers import (
     SendOTPSerializer, VerifyOTPSerializer, OnboardingSerializer, 
     UserProfileSerializer, MealEntrySerializer, AddMealEntrySerializer,
-    DailyNutritionSummarySerializer, UserAppSettingsSerializer, FoodSerializer
+    DailyNutritionSummarySerializer, UserAppSettingsSerializer
 )
 
 User = get_user_model()
@@ -63,8 +63,10 @@ def calculate_nutrition_targets(user):
     else:
         bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age) - 161
     
-    # Activity level multiplier (moderate activity = 1.55x)
-    tdee = bmr * 1.55
+    # Activity level multiplier (Default to 1.55 as activity_level removed)
+    multiplier = 1.55
+    
+    tdee = bmr * multiplier
     
     # Calories target = TDEE (no goal-based adjustment)
     calories_target = int(tdee)
@@ -210,6 +212,10 @@ class VerifyOTPView(APIView):
             is_new_user=created,
         )
 
+        # Refresh Login History: Delete logs older than 7 days
+        one_week_ago = timezone.now() - timedelta(days=7)
+        LoginHistory.objects.filter(logged_at__lt=one_week_ago).delete()
+
         refresh = RefreshToken.for_user(user)
         access = refresh.access_token
 
@@ -337,6 +343,7 @@ class OnboardingCompleteView(APIView):
         other_condition_text = data.get("other_condition_text", "")
         allergies = data.get("allergies", [])
         allergy_notes = data.get("allergy_notes", "")
+        target_weight = data.get("target_weight")
 
         # simple validations
         if not name:
@@ -379,10 +386,16 @@ class OnboardingCompleteView(APIView):
                 "other_condition_text": other_condition_text,
                 "allergies": allergies,
                 "allergy_notes": allergy_notes,
+                "target_weight": target_weight,
             },
         )
 
-     
+        # Update user_name in related tables
+        DailyNutritionSummary.objects.filter(user=user).update(user_name=name)
+        MealEntry.objects.filter(user=user).update(user_name=name)
+        UserAppSettings.objects.filter(user=user).update(user_name=name)
+        LoginHistory.objects.filter(user=user).update(user_name=name)
+
         user.onboarding_completed = True
         user.save(update_fields=["onboarding_completed"])
 
@@ -436,6 +449,7 @@ class OnboardingProfileView(APIView):
                 "gender": profile.gender,
                 "goal": profile.goal,
                 "diet_preference": profile.diet_preference,
+                "target_weight": profile.target_weight,
                 "health_conditions": profile.health_conditions,
                 "other_condition_text": profile.other_condition_text,
                 "allergies": profile.allergies,
@@ -481,6 +495,7 @@ class DashboardTodayView(APIView):
             user=user,
             date=today,
             defaults={
+                "user_name": user_name,
                 "calories_target": targets["calories_target"],
                 "protein_target": targets["protein_target"],
                 "carbs_target": targets["carbs_target"],
@@ -505,6 +520,10 @@ class DashboardTodayView(APIView):
         summary.fats_target = targets["fats_target"]
         
         summary.save()
+        
+        if not summary.user_name:
+            summary.user_name = user_name
+            summary.save()
 
         def get_pct(consumed, target):
             if not target or target <= 0: return 0
@@ -988,6 +1007,70 @@ class MealRecommendationsView(APIView):
             return 500  # Default fallback
 
 
+class WeeklyMealRecommendationView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name='week_start_date',
+                description='Start date of the week (YYYY-MM-DD). Defaults to the most recent Monday.',
+                required=False,
+                type=OpenApiTypes.DATE,
+            ),
+        ],
+        responses={200: OpenApiTypes.OBJECT}
+    )
+    def get(self, request):
+        user = request.user
+        date_str = request.query_params.get("week_start_date")
+
+        if not date_str:
+            # Fallback to current Monday
+            today = timezone.localdate()
+            monday = today - timedelta(days=today.weekday())
+        else:
+            try:
+                monday = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=400)
+
+        try:
+            profile = user.profile
+        except UserProfile.DoesNotExist:
+            return Response({"error": "Onboarding not completed"}, status=400)
+
+        # Check for cached weekly recommendation
+        weekly_rec, created = WeeklyMealRecommendation.objects.get_or_create(
+            user=user,
+            week_start_date=monday,
+            defaults={"user_name": profile.name}
+        )
+
+        if not weekly_rec.recommendations_data or created:
+            # Generate recommendations for 7 days
+            week_data = {}
+            meal_types = ["Breakfast", "Brunch", "Lunch", "Evening Snacks", "Dinner"]
+            
+            for i in range(7):
+                current_day = monday + timedelta(days=i)
+                day_key = str(current_day)
+                week_data[day_key] = {}
+                
+                for m_type in meal_types:
+                    ai_resp = recommend_meals_for_user(profile, m_type)
+                    week_data[day_key][m_type] = ai_resp.get("items", [])
+            
+            weekly_rec.recommendations_data = week_data
+            weekly_rec.save()
+
+        return Response({
+            "user_name": profile.name,
+            "week_start_date": monday.isoformat(),
+            "recommendations": weekly_rec.recommendations_data
+        }, status=status.HTTP_200_OK)
+
+
 #Daywise meals
 class DayMealsView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1272,12 +1355,19 @@ class AddMealEntryView(APIView):
 
         # same user + same date + same meal_type + same name unte → quantity increase
 
+        user_name = "User"
+        try:
+            user_name = user.profile.name if user.profile.name else "User"
+        except:
+            pass
+
         entry, created = MealEntry.objects.get_or_create(
             user=user,
             date=date_obj,
             meal_type=meal_type,
             name=name,
             defaults={
+                "user_name": user_name,
                 "serving": serving,
                 "quantity": quantity,
                 "calories": one_cal * quantity,

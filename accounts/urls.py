@@ -23,6 +23,7 @@ from .views import (
     ProfileSettingsView,
     HelpSupportView,
     DeleteAccountView,
+    WeeklyMealRecommendationView,
 )
 from .views import DayMealsView, WeeklyMacrosView, CaloriesTrendView
 urlpatterns = [
@@ -39,6 +40,7 @@ urlpatterns = [
     path('dashboard/monthly/', DashboardMonthlyView.as_view(), name='dashboard-monthly'),
     path('meal/categories/', MealCategoriesView.as_view(), name='meal-categories'),
     path('meal/recommendations/', MealRecommendationsView.as_view(), name='meal-recommendations'),
+    path('meal/weekly-recommendations/', WeeklyMealRecommendationView.as_view(), name='weekly-meal-recommendations'),
     path('meal/add/', AddMealEntryView.as_view(), name='add-meal-entry'),
     path('meal/remove/<int:entry_id>/', RemoveMealEntryView.as_view(), name='remove-meal-entry'),
     path('meal/toggle-eaten/<int:entry_id>/', ToggleMealEatenView.as_view(), name='toggle-meal-eaten'),

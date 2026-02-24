@@ -1,5 +1,9 @@
 from rest_framework import serializers
-from .models import UserProfile, MealEntry, DailyNutritionSummary, UserAppSettings, Food, OTP, MealRecommendation
+from .models import (
+    UserProfile, MealEntry, DailyNutritionSummary, 
+    UserAppSettings, OTP, MealRecommendation, 
+    WeeklyMealRecommendation
+)
 
 class SendOTPSerializer(serializers.Serializer):
     mobile = serializers.CharField(max_length=15, required=True)
@@ -13,8 +17,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = UserProfile
         fields = [
             'id', 'user', 'name', 'age', 'weight', 'weight_unit', 'height_cm', 
-            'gender', 'goal', 'diet_preference', 'health_conditions', 
-            'other_condition_text', 'allergies', 'allergy_notes', 'profile_image'
+            'gender', 'goal', 'diet_preference', 'target_weight',
+            'health_conditions', 'other_condition_text', 'allergies', 'allergy_notes', 'profile_image'
         ]
         read_only_fields = ['user']
 
@@ -31,6 +35,7 @@ class OnboardingSerializer(serializers.Serializer):
     other_condition_text = serializers.CharField(required=False, allow_blank=True)
     allergies = serializers.ListField(child=serializers.CharField(), required=False)
     allergy_notes = serializers.CharField(required=False, allow_blank=True)
+    target_weight = serializers.FloatField(required=False, allow_null=True)
 
 class MealEntrySerializer(serializers.ModelSerializer):
     class Meta:
@@ -55,7 +60,7 @@ class DailyNutritionSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = DailyNutritionSummary
         fields = [
-            'date', 'calories_target', 'calories_consumed', 
+            'date', 'user_name', 'calories_target', 'calories_consumed', 
             'protein_g', 'protein_target', 'carbs_g', 'carbs_target', 'fats_g', 'fats_target'
         ]
 
@@ -67,10 +72,7 @@ class UserAppSettingsSerializer(serializers.ModelSerializer):
             'reminder_time', 'weekly_summary_enabled'
         ]
 
-class FoodSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Food
-        fields = '__all__'
+
 class MealItemSerializer(serializers.Serializer):
     """Serializer for individual meal items in recommendations"""
     name = serializers.CharField()
@@ -96,3 +98,8 @@ class MealRecommendationSerializer(serializers.ModelSerializer):
     def get_items(self, obj):
         """Return items with all nutritional and image data"""
         return obj.items_json
+
+class WeeklyMealRecommendationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WeeklyMealRecommendation
+        fields = ['week_start_date', 'user_name', 'recommendations_data', 'created_at']
