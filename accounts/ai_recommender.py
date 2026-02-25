@@ -97,11 +97,37 @@ def recommend_meals_for_user(profile, meal_type: str):
         "allergies": profile.allergies or [],
     }
 
+    def clean_numeric(val):
+        """Helper to ensure macro values are single numbers, not ranges or strings with units"""
+        if isinstance(val, (int, float)):
+            return int(val)
+        if isinstance(val, str):
+            import re
+            # Handle ranges like "250-300" by taking the average
+            if "-" in val:
+                nums = re.findall(r"\d+\.?\d*", val)
+                if len(nums) >= 2:
+                    try:
+                        return int((float(nums[0]) + float(nums[1])) / 2.0)
+                    except:
+                        pass
+            # Just take the first number found
+            nums = re.findall(r"\d+\.?\d*", val)
+            if nums:
+                try:
+                    return int(float(nums[0]))
+                except:
+                    pass
+        return 0
+
     system_prompt = (
         "You are a nutritionist. Suggest suitable Indian food options for one meal. "
         "Respect diet_preference, health_conditions, and allergies. "
         "Respond ONLY as JSON: { 'items': [ { 'name', 'serving', 'calories', 'protein_g', 'carbs_g', 'fats_g', 'note' } ], "
-        "'image_prompt': 'desc' }."
+        "'image_prompt': 'desc' }. "
+        "IMPORTANT: 'calories', 'protein_g', 'carbs_g', and 'fats_g' MUST be single numeric integers. "
+        "NO DECIMALS (e.g., use 15 instead of 15.5). "
+        "DO NOT use ranges like '250-300' or include 'g' or 'kcal' in these numeric fields."
     )
 
     try:
@@ -125,10 +151,10 @@ def recommend_meals_for_user(profile, meal_type: str):
         cleaned.append({
             "name": item.get("name", ""),
             "serving": item.get("serving", ""),
-            "calories": item.get("calories", 0),
-            "protein_g": item.get("protein_g", 0),
-            "carbs_g": item.get("carbs_g", 0),
-            "fats_g": item.get("fats_g", 0),
+            "calories": clean_numeric(item.get("calories", 0)),
+            "protein_g": clean_numeric(item.get("protein_g", 0)),
+            "carbs_g": clean_numeric(item.get("carbs_g", 0)),
+            "fats_g": clean_numeric(item.get("fats_g", 0)),
             "note": item.get("note", ""),
             "image_url": get_fallback_image_url(item.get("name", "")) # Using fallback for speed
         })
