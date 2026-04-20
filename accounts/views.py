@@ -206,6 +206,8 @@ class VerifyOTPView(APIView):
         user, created = User.objects.get_or_create(
             mobile=mobile
         )
+        user.last_activity = timezone.now()
+        user.save()
 
         #Login-History
         user_name = ""
