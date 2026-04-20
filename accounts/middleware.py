@@ -8,23 +8,31 @@ class UpdateLastActivityMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.user.is_authenticated:
-            now = timezone.now()
-            last_activity = request.user.last_activity
-            
-            # Check if user has been inactive for more than 10 days
-            if last_activity and (now - last_activity) > timedelta(days=10):
-                # Optionally: here you could also blacklist tokens if using a more complex setup
-                # For now, we just return 401 to force logout on the frontend
-                return JsonResponse(
-                    {"error": "Session expired due to inactivity. Please login again."},
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
-            
-            # Update last activity if more than 1 minute has passed (to avoid database spam)
-            if not last_activity or (now - last_activity) > timedelta(minutes=1):
-                request.user.last_activity = now
-                request.user.save(update_fields=['last_activity'])
+        # Only apply inactivity check to app API users
+        path = request.path
+        if path.startswith('/api/') and not (path.startswith('/api/schema/') or path.startswith('/api/auth/')):
+            if request.user.is_authenticated:
+                now = timezone.now()
+                last_activity = request.user.last_activity
+                
+                # Check if inactive for more than 5 minutes
+                if last_activity and (now - last_activity) > timedelta(minutes=5):
+                    return JsonResponse(
+                        {"error": "Session expired. Please login again."},
+                        status=status.HTTP_401_UNAUTHORIZED
+                    )
+                
+                # Update last activity
+                if not last_activity or (now - last_activity) > timedelta(minutes=1):
+                    request.user.last_activity = now
+                    request.user.save(update_fields=['last_activity'])
+        else:
+            # For non-API or Auth/Swagger, just update activity without blocking
+            if request.user.is_authenticated:
+                now = timezone.now()
+                if not request.user.last_activity or (now - request.user.last_activity) > timedelta(minutes=1):
+                    request.user.last_activity = now
+                    request.user.save(update_fields=['last_activity'])
 
         response = self.get_response(request)
         return response
