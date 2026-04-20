@@ -8,8 +8,11 @@ class UpdateLastActivityMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # Skip inactivity check for admin panel and swagger docs
-        if request.path.startswith('/admin/') or request.path.startswith('/api/schema/'):
+        # Only apply inactivity check to API endpoints, excluding swagger docs
+        is_api_path = request.path.startswith('/api/')
+        is_swagger_path = request.path.startswith('/api/schema/')
+        
+        if not is_api_path or is_swagger_path:
             return self.get_response(request)
 
         if request.user.is_authenticated:
