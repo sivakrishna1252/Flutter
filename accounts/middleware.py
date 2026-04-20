@@ -12,8 +12,8 @@ class UpdateLastActivityMiddleware:
             now = timezone.now()
             last_activity = request.user.last_activity
             
-            # Check if user has been inactive for more than 10 days
-            if last_activity and (now - last_activity) > timedelta(days=10):
+            # Check if user has been inactive for more than 10 minutes
+            if last_activity and (now - last_activity) > timedelta(minutes=10):
                 # Optionally: here you could also blacklist tokens if using a more complex setup
                 # For now, we just return 401 to force logout on the frontend
                 return JsonResponse(
