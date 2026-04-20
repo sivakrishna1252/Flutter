@@ -144,7 +144,10 @@ class SendOTPView(APIView):
         OTP.objects.update_or_create(
             mobile=mobile,
             is_used=False,
-            defaults={"code": otp_code}
+            defaults={
+                "code": otp_code,
+                "created_at": timezone.now()
+            }
         )
 
         # Send via Twilio Standard SMS

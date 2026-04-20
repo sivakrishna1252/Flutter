@@ -57,9 +57,10 @@ class OTP(models.Model):
     is_used = models.BooleanField(default=False)
 
     def is_expired(self):
-        """OTP expires after 15 minutes"""
-        expiry_time = self.created_at + timedelta(minutes=15)
-        return timezone.now() > expiry_time
+        """OTP expires after 30 minutes to account for production delays/time gaps"""
+        now = timezone.now()
+        diff = now - self.created_at
+        return diff.total_seconds() > (30 * 60)  # 30 minutes in seconds
 
     def __str__(self):
         return f"{self.mobile} - {self.code}"
