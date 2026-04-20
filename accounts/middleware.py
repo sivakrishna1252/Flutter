@@ -15,8 +15,8 @@ class UpdateLastActivityMiddleware:
                 now = timezone.now()
                 last_activity = request.user.last_activity
                 
-                # Check if inactive for more than 5 minutes
-                if last_activity and (now - last_activity) > timedelta(minutes=5):
+                # Check if inactive for more than 30 days
+                if last_activity and (now - last_activity) > timedelta(days=30):
                     return JsonResponse(
                         {"error": "Session expired. Please login again."},
                         status=status.HTTP_401_UNAUTHORIZED
