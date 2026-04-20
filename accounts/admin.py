@@ -3,7 +3,8 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
     User, OTP, LoginHistory, UserProfile, 
     DailyNutritionSummary, MealEntry, 
-    MealRecommendation, WeeklyMealRecommendation
+    MealRecommendation, WeeklyMealRecommendation,
+    HelpSupport
 )
 
 # Rename the Admin Site
@@ -106,3 +107,9 @@ class UserProfileAdmin(admin.ModelAdmin):
     list_filter = ("gender", "goal", "diet_preference")
     search_fields = ("user__mobile", "name")
     readonly_fields = ("updated_at",)
+
+@admin.register(HelpSupport)
+class HelpSupportAdmin(admin.ModelAdmin):
+    list_display = ("name", "email", "mobile", "created_at")
+    search_fields = ("name", "email", "mobile")
+    readonly_fields = ("created_at",)

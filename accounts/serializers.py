@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import (
     UserProfile, MealEntry, DailyNutritionSummary, 
     UserAppSettings, OTP, MealRecommendation, 
-    WeeklyMealRecommendation
+    WeeklyMealRecommendation, HelpSupport
 )
 
 class SendOTPSerializer(serializers.Serializer):
@@ -103,3 +103,8 @@ class WeeklyMealRecommendationSerializer(serializers.ModelSerializer):
     class Meta:
         model = WeeklyMealRecommendation
         fields = ['week_start_date', 'user_name', 'recommendations_data', 'created_at']
+
+class HelpSupportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HelpSupport
+        fields = ['id', 'name', 'email', 'mobile', 'message', 'created_at']

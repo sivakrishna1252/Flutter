@@ -16,8 +16,11 @@ services:
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://openrouter.ai/api/v1}
       - OPENAI_MODEL_NAME=${OPENAI_MODEL_NAME:-nvidia/nemotron-3-nano-30b-a3b:free}
       - OPENAI_IMAGE_MODEL_NAME=${OPENAI_IMAGE_MODEL_NAME:-stabilityai/stable-diffusion-xl-base-1.0}
+      - EMAIL_USER=${EMAIL_USER:-}
+      - EMAIL_PASS=${EMAIL_PASS:-}
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+      - TWILIO_VERIFY_SERVICE_SID=${TWILIO_VERIFY_SERVICE_SID:-}
       - TWILIO_FROM_NUMBER=${TWILIO_FROM_NUMBER:-}
     volumes:
       - static_volume:/app/staticfiles

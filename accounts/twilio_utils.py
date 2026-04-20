@@ -1,21 +1,23 @@
 # accounts/twilio_utils.py
-import os
+from django.conf import settings
 from twilio.rest import Client
 
 def send_otp_sms(mobile: str, code: str) -> bool:
     """
-    Send OTP via Twilio SMS.
+    Send a custom OTP code via Twilio standard SMS.
+    This allows us to store the exact same code in our database.
     """
-    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
-    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-    from_number = os.getenv("TWILIO_FROM_NUMBER")
+    account_sid = getattr(settings, "TWILIO_ACCOUNT_SID", None)
+    auth_token = getattr(settings, "TWILIO_AUTH_TOKEN", None)
+    from_number = getattr(settings, "TWILIO_FROM_NUMBER", None)
 
     if not all([account_sid, auth_token, from_number]):
-        print("Twilio env vars missing!")
+        print("Twilio settings missing!")
         return False
 
     client = Client(account_sid, auth_token)
 
+    # Note: Trail accounts can only send to verified numbers.
     body = f"Your Diet App OTP is {code}. It is valid for 5 minutes."
 
     try:

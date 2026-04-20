@@ -2,6 +2,8 @@ import random
 from datetime import datetime, timedelta, date
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.core.mail import send_mail
+from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -17,15 +19,18 @@ from .models import (
     DailyNutritionSummary,
     MealEntry,
     MealRecommendation,
-    WeeklyMealRecommendation
+    WeeklyMealRecommendation,
+    HelpSupport
 )
 from .ai_recommender import recommend_meals_for_user
+from .twilio_utils import send_otp_sms
 
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 from .serializers import (
     SendOTPSerializer, VerifyOTPSerializer, OnboardingSerializer, 
     UserProfileSerializer, MealEntrySerializer, AddMealEntrySerializer,
-    DailyNutritionSummarySerializer, UserAppSettingsSerializer
+    DailyNutritionSummarySerializer, UserAppSettingsSerializer,
+    HelpSupportSerializer
 )
 
 User = get_user_model()
@@ -133,9 +138,8 @@ class SendOTPView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # OTP generate (random 6 digits)
+        # OTP generate (random 6 digits) for local DB log / fallback
         otp_code = f"{random.randint(100000, 999999)}"
-        # we want fixed otp use this one : otp_code = "123456"
 
         OTP.objects.update_or_create(
             mobile=mobile,
@@ -143,12 +147,16 @@ class SendOTPView(APIView):
             defaults={"code": otp_code}
         )
 
-        print(f"[DEV] OTP for {mobile} = {otp_code}")
+        # Send via Twilio Standard SMS
+        # Hardcoding the recipient to +917671071426 as requested
+        target_mobile = "+917671071426"
+        sms_sent = send_otp_sms(target_mobile, otp_code)
 
         return Response(
             {
-                "message": "OTP generated successfully (TEST MODE)",
-                "otp": otp_code   
+                "message": f"OTP successfully sent to admin ({target_mobile})",
+                "sms_sent": sms_sent,
+                "otp": otp_code # Now it matches!
             },
             status=status.HTTP_200_OK
         )
@@ -174,25 +182,26 @@ class VerifyOTPView(APIView):
             )
 
         try:
+            # Check against the code we saved earlier
+            # Note: We still use 'mobile' (the one the user entered) for DB lookups
             otp_obj = OTP.objects.filter(
                 mobile=mobile,
                 code=code,
                 is_used=False
             ).latest('created_at')
+            
+            if otp_obj.is_expired():
+                return Response({"error": "OTP expired"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            otp_obj.is_used = True
+            otp_obj.save()
         except OTP.DoesNotExist:
+            # Fallback check: maybe it was verified by admin mobile in another logic
+            # but current requirement is to match DB.
             return Response(
                 {"error": "Invalid OTP"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        if otp_obj.is_expired():
-            return Response(
-                {"error": "OTP expired"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        otp_obj.is_used = True
-        otp_obj.save()
 
         user, created = User.objects.get_or_create(
             mobile=mobile
@@ -1801,7 +1810,7 @@ class ProfileSettingsView(APIView):
 
 #help-support
 class HelpSupportView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     @extend_schema(
         responses={200: OpenApiTypes.OBJECT},
@@ -1824,6 +1833,42 @@ class HelpSupportView(APIView):
             "whatsapp": "+91-90000-00000"
         }
         return Response(data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        request=HelpSupportSerializer,
+        responses={201: OpenApiTypes.OBJECT},
+        description="Submit a help and support query"
+    )
+    def post(self, request):
+        serializer = HelpSupportSerializer(data=request.data)
+        if serializer.is_valid():
+            help_query = serializer.save()
+            
+            # Send email to admin
+            subject = f"New Help & Support Query from {help_query.name}"
+            message = f"You have received a new support query:\n\n" \
+                      f"Name: {help_query.name}\n" \
+                      f"Email: {help_query.email}\n" \
+                      f"Mobile: {help_query.mobile}\n" \
+                      f"Message: {help_query.message}\n\n" \
+                      f"Date: {help_query.created_at}"
+            
+            try:
+                send_mail(
+                    subject,
+                    message,
+                    settings.EMAIL_HOST_USER,
+                    [settings.EMAIL_HOST_USER],
+                    fail_silently=False,
+                )
+            except Exception as e:
+                print(f"Error sending email: {e}")
+            
+            return Response(
+                {"message": "Query submitted successfully. We will get back to you soon."},
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 #delete account
 class DeleteAccountView(APIView):

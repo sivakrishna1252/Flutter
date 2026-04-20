@@ -10,11 +10,13 @@ services:
       # - ./config/.env:/app/config/.env:ro
     environment:
       - PYTHONUNBUFFERED=1
-      # Add your environment variables here or use .env file
-      # - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
-      # - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
-      # - TWILIO_FROM_NUMBER=${TWILIO_FROM_NUMBER}
-      # - OPENAI_API_KEY=${OPENAI_API_KEY}
-      # - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_VERIFY_SERVICE_SID=${TWILIO_VERIFY_SERVICE_SID}
+      - TWILIO_FROM_NUMBER=${TWILIO_FROM_NUMBER}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
     restart: unless-stopped
     command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8080"

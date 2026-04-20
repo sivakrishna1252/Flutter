@@ -300,3 +300,19 @@ class WeeklyMealRecommendation(models.Model):
             return self.user.profile.name if self.user.profile.name else self.user.mobile
         except:
             return self.user.mobile
+
+
+# HELP AND SUPPORT MODEL
+class HelpSupport(models.Model):
+    name = models.CharField(max_length=100)
+    email = models.EmailField()
+    mobile = models.CharField(max_length=15)
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.name} - {self.email}"
+
+    class Meta:
+        verbose_name = "Help & Support"
+        verbose_name_plural = "Help & Support Queries"

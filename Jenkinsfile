@@ -10,6 +10,14 @@
             OPENAI_BASE_URL        = credentials('OPENAI_BASE_URL')
             OPENAI_MODEL_NAME      = credentials('OPENAI_MODEL_NAME')
             OPENAI_IMAGE_MODEL_NAME = credentials('OPENAI_IMAGE_MODEL_NAME')
+
+            // Email and Twilio credentials
+            EMAIL_USER             = credentials('EMAIL_USER')
+            EMAIL_PASS             = credentials('EMAIL_PASS')
+            TWILIO_ACCOUNT_SID     = credentials('TWILIO_ACCOUNT_SID')
+            TWILIO_AUTH_TOKEN      = credentials('TWILIO_AUTH_TOKEN')
+            TWILIO_VERIFY_SERVICE_SID = credentials('TWILIO_VERIFY_SERVICE_SID')
+            TWILIO_FROM_NUMBER     = credentials('TWILIO_FROM_NUMBER')
         }
 
         stages {
@@ -79,6 +87,12 @@
                             -e OPENAI_BASE_URL="$OPENAI_BASE_URL" \
                             -e OPENAI_MODEL_NAME="$OPENAI_MODEL_NAME" \
                             -e OPENAI_IMAGE_MODEL_NAME="$OPENAI_IMAGE_MODEL_NAME" \
+                            -e EMAIL_USER="$EMAIL_USER" \
+                            -e EMAIL_PASS="$EMAIL_PASS" \
+                            -e TWILIO_ACCOUNT_SID="$TWILIO_ACCOUNT_SID" \
+                            -e TWILIO_AUTH_TOKEN="$TWILIO_AUTH_TOKEN" \
+                            -e TWILIO_VERIFY_SERVICE_SID="$TWILIO_VERIFY_SERVICE_SID" \
+                            -e TWILIO_FROM_NUMBER="$TWILIO_FROM_NUMBER" \
                             -e DATABASE_PATH="/app/db_data/db.sqlite3" \
                             -v diet_planner_db:/app/db_data \
                             --restart always \
