@@ -130,7 +130,7 @@ class SendOTPView(APIView):
         description="Send OTP to mobile number"
     )
     def post(self, request):
-        mobile = request.data.get('mobile')
+        mobile = request.data.get('mobile', '').strip()
 
         if not mobile:
             return Response(
@@ -138,7 +138,7 @@ class SendOTPView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # OTP generate (random 6 digits) for local DB log / fallback
+        # OTP generate (random 6 digits)
         otp_code = f"{random.randint(100000, 999999)}"
 
         OTP.objects.update_or_create(
@@ -150,16 +150,28 @@ class SendOTPView(APIView):
             }
         )
 
-        # Send via Twilio Standard SMS
-        # Hardcoding the recipient to +917671071426 as requested
-        target_mobile = "+917671071426"
+        # Routing Logic
+        whitelist = getattr(settings, 'OTP_WHITELIST', [])
+        admin_mobile = getattr(settings, 'ADMIN_MOBILE', "+917757046437")
+
+        # Normalize number for checking (remove spaces for comparison)
+        normalized_mobile = mobile.replace(" ", "").replace("-", "")
+        
+        if normalized_mobile in whitelist:
+            target_mobile = normalized_mobile
+            source_info = f"verified user ({target_mobile})"
+        else:
+            target_mobile = admin_mobile
+            source_info = f"admin hub ({target_mobile}) for unverified user {mobile}"
+
+        # Send via Twilio
         sms_sent = send_otp_sms(target_mobile, otp_code)
 
         return Response(
             {
-                "message": f"OTP successfully sent to admin ({target_mobile})",
+                "message": f"OTP successfully sent to {source_info}",
                 "sms_sent": sms_sent,
-                "otp": otp_code # Now it matches!
+                "otp": otp_code 
             },
             status=status.HTTP_200_OK
         )
