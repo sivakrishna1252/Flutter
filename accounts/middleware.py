@@ -8,6 +8,10 @@ class UpdateLastActivityMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        # Skip inactivity check for admin panel and swagger docs
+        if request.path.startswith('/admin/') or request.path.startswith('/api/schema/'):
+            return self.get_response(request)
+
         if request.user.is_authenticated:
             now = timezone.now()
             last_activity = request.user.last_activity
